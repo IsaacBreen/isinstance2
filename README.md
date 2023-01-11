@@ -83,6 +83,22 @@ def is_instance_of_my_class(obj: Any) -> bool:
 assert isinstance2(MyClass(), MyClass)
 ```
 
+If you'd prefer not to add your checkers globally, you can use `isinstance2`'s `register` instead and pass a custom registry (which is just a `dict`).
+
+```python
+from typing import Generic, TypeVar
+from isinstance2 import register, instance_checker_registry
+from functools import partial
+
+# Copy the default registry
+my_registry = instance_checker_registry.copy()
+
+# Make a custom registration function
+my_register = partial(register, registry=my_registry)
+```
+
+Now you can use `my_register` in place of `register_instance_checker`.
+
 ## Limitations
 
 - Does not yet support

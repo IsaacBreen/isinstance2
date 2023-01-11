@@ -91,7 +91,9 @@ for MappingSubtype in (Mapping, MutableMapping, Dict, dict):
     )
 
 
-def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
+def isinstance2(
+    obj: Any, cls: type | GenericAlias, instance_check_registry: Dict[type, callable] = instance_checker_registry
+) -> bool:
     """
     Check if an object is an instance of a subscripted superclass.
 
