@@ -6,15 +6,23 @@ import types
 import typing
 from collections.abc import Collection
 from collections.abc import Iterable
+from collections.abc import Mapping
+from collections.abc import MutableMapping
 from collections.abc import Sequence
+from functools import partial
 from types import UnionType
 from typing import Any
+from typing import Dict
+from typing import List
 from typing import Literal
+from typing import Tuple
 from typing import TypeVar
 from typing import TypeVarTuple
 from typing import Union
 from typing import get_args
 from typing import get_origin
+from typing import Optional
+
 
 GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | types.UnionType  # type: ignore
 
@@ -30,6 +38,9 @@ def register(registry, key):
         return func
 
     return decorator
+
+
+register_instance_checker = partial(register, instance_checker_registry)
 
 
 @register(instance_checker_registry, Union)
@@ -50,6 +61,7 @@ def _is_instance_of_literal(obj: Any, *args: type | GenericAlias) -> bool:
 
 
 @register(instance_checker_registry, tuple)
+@register(instance_checker_registry, Tuple)
 def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
     if not isinstance(obj, tuple):
         return False
@@ -62,31 +74,44 @@ def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
 
 
 @register(instance_checker_registry, list)
-def _is_instance_of_list(obj: Any, arg: type | GenericAlias) -> bool:
+@register(instance_checker_registry, List)
+def _is_instance_of_list(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
     if not isinstance(obj, list):
         return False
-    return all(isinstance2(item, arg) for item in obj)
+    return arg is None or all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Sequence)
-def _is_instance_of_sequence(obj: Any, arg: type | GenericAlias) -> bool:
+def _is_instance_of_sequence(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
     if not isinstance(obj, Sequence):
         return False
-    return all(isinstance2(item, arg) for item in obj)
+    return arg is None or all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Iterable)
-def _is_instance_of_iterable(obj: Any, arg: type | GenericAlias) -> bool:
+def _is_instance_of_iterable(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
     if not isinstance(obj, Iterable):
         return False
-    return all(isinstance2(item, arg) for item in obj)
+    return arg is None or all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Collection)
-def _is_instance_of_collection(obj: Any, arg: type | GenericAlias) -> bool:
+def _is_instance_of_collection(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
     if not isinstance(obj, Collection):
         return False
-    return all(isinstance2(item, arg) for item in obj)
+    return arg is None or all(isinstance2(item, arg) for item in obj)
+
+
+for MappingType in (Mapping, MutableMapping, Dict, dict):
+    @register(instance_checker_registry, MappingType)
+    def _is_instance_of_mapping(obj: Any, key_type: Optional[type | GenericAlias], value_type: Optional[type | GenericAlias]) -> bool:
+        if not isinstance(obj, MappingType):
+            return False
+        if key_type is None and value_type is None:
+            return True
+        if key_type is None or value_type is None:
+            raise TypeError(f"Got only one of key_type and value_type, expected both or neither")
+        return all(isinstance2(key, key_type) and isinstance2(value, value_type) for key, value in obj.items())
 
 
 def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
@@ -108,9 +133,7 @@ def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
 
         args = get_args(cls)
 
-        if len(args) == 0:
-            return isinstance(obj, origin_cls)
-        else:
+        if len(args) > 0:
             if origin_cls in instance_checker_registry:
                 return instance_checker_registry[origin_cls](obj, *args)
             else:
@@ -201,6 +224,24 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
         # If the superclass is a tuple, the origin of cls must be a subclass of the origin of superclass
         if origin_superclass == tuple and not issubclass(origin_cls, tuple):
             return False
+
+        # Check for the mapping cases
+        if issubclass(origin_superclass, Mapping):
+            # The origin of cls must be a subclass of the origin of superclass
+            if not issubclass(origin_cls, origin_superclass):
+                return False
+
+            # If one of the classes lacks arguments, we presume a match
+            if len(args_cls) == 0 or len(args_superclass) == 0:
+                return True
+
+            # Otherwise, both classes must have exactly two arguments
+            if len(args_cls) != 2 or len(args_superclass) != 2:
+                raise TypeError(f"Expected two arguments, got {len(args_cls)} and {len(args_superclass)}")
+
+            # The first argument of cls (the key) must be a subclass of the first argument of superclass,
+            # and likewise for the second argument (the value)
+            return issubclass2(args_cls[0], args_superclass[0]) and issubclass2(args_cls[1], args_superclass[1])
 
         # Get the single argument of superclass
         if len(args_superclass) != 1:
