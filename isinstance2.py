@@ -1,5 +1,5 @@
 """
-This module provides implementations of `isinstance2` and `issubclass2` functions which extends the built-in `isinstance` and `issubclass` functions in Python to work with subscripted generics.
+This module provides two functions - `isinstance2` and `issubclass2` - which extend the built-in `isinstance` and `issubclass` functions in Python to work with subscripted generics.
 """
 import types
 import typing
@@ -35,7 +35,7 @@ def register(registry, key):
 @register(instance_checker_registry, UnionType)
 def _is_instance_of_union(obj: Any, *args: type | GenericAlias) -> bool:
     for arg in args:
-        if isinstance(obj, arg):
+        if isinstance2(obj, arg):
             return True
     return False
 
@@ -55,40 +55,40 @@ def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
     if Ellipsis in args:
         if len(args) != 2:
             raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args)}")
-        return all(isinstance(item, args[0]) for item in obj)
+        return all(isinstance2(item, args[0]) for item in obj)
     else:
-        return len(obj) == len(args) and all(isinstance(item, arg) for item, arg in zip(obj, args))
+        return len(obj) == len(args) and all(isinstance2(item, arg) for item, arg in zip(obj, args))
 
 
 @register(instance_checker_registry, list)
 def _is_instance_of_list(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, list):
         return False
-    return all(isinstance(item, arg) for item in obj)
+    return all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Sequence)
 def _is_instance_of_sequence(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Sequence):
         return False
-    return all(isinstance(item, arg) for item in obj)
+    return all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Iterable)
 def _is_instance_of_iterable(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Iterable):
         return False
-    return all(isinstance(item, arg) for item in obj)
+    return all(isinstance2(item, arg) for item in obj)
 
 
 @register(instance_checker_registry, Collection)
 def _is_instance_of_collection(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Collection):
         return False
-    return all(isinstance(item, arg) for item in obj)
+    return all(isinstance2(item, arg) for item in obj)
 
 
-def isinstance(obj: Any, generic_type: type | GenericAlias) -> bool:
+def isinstance2(obj: Any, generic_type: type | GenericAlias) -> bool:
     """
     Check if an object is an instance of a subscripted generic type.
 
@@ -122,7 +122,7 @@ def isinstance(obj: Any, generic_type: type | GenericAlias) -> bool:
         raise TypeError(f"Expected a type or a GenericAlias, got {generic_type} of type {type(generic_type)}")
 
 
-def issubclass(cls: type | GenericAlias, generic_type: type | GenericAlias) -> bool:  # type: ignore
+def issubclass2(cls: type | GenericAlias, generic_type: type | GenericAlias) -> bool:  # type: ignore
     """
     Check if a class is a subclass of a subscripted generic type.
 
@@ -135,11 +135,11 @@ def issubclass(cls: type | GenericAlias, generic_type: type | GenericAlias) -> b
     """
     # NOTE: I haven't figured out how to split this function up sensibly like above. But here it is.
     if isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
-        return all(issubclass(arg, generic_type) for arg in get_args(cls))
+        return all(issubclass2(arg, generic_type) for arg in get_args(cls))
     elif isinstance(cls, GenericAlias) and get_origin(cls) == Literal:
-        return all(isinstance(obj, generic_type) for obj in get_args(cls))
+        return all(isinstance2(obj, generic_type) for obj in get_args(cls))
     elif isinstance(generic_type, GenericAlias) and get_origin(generic_type) in (Union, UnionType):
-        return any(issubclass(cls, arg) for arg in get_args(generic_type))
+        return any(issubclass2(cls, arg) for arg in get_args(generic_type))
     elif isinstance(cls, GenericAlias) and isinstance(generic_type, GenericAlias):
         origin_cls: type = get_origin(cls)
         origin_generic_type: type = get_origin(generic_type)
@@ -168,12 +168,12 @@ def issubclass(cls: type | GenericAlias, generic_type: type | GenericAlias) -> b
             if Ellipsis in args_cls and Ellipsis not in args_generic_type:
                 return False
             elif Ellipsis not in args_cls and Ellipsis in args_generic_type:
-                return all(issubclass(arg_cls, args_generic_type[0]) for arg_cls in args_cls)
+                return all(issubclass2(arg_cls, args_generic_type[0]) for arg_cls in args_cls)
             elif Ellipsis in args_cls and Ellipsis in args_generic_type:
-                return issubclass(args_cls[0], args_generic_type[0])
+                return issubclass2(args_cls[0], args_generic_type[0])
             elif Ellipsis not in args_cls and Ellipsis not in args_generic_type:
                 return len(args_cls) == len(args_generic_type) and all(
-                    issubclass(arg_cls, arg_generic_type) for arg_cls, arg_generic_type in
+                    issubclass2(arg_cls, arg_generic_type) for arg_cls, arg_generic_type in
                         zip(args_cls, args_generic_type)
                 )
 
@@ -186,7 +186,7 @@ def issubclass(cls: type | GenericAlias, generic_type: type | GenericAlias) -> b
 
         if origin_cls == tuple and origin_generic_type != tuple:
             return issubclass(origin_cls, origin_generic_type) and all(
-                issubclass(arg_cls, arg_generic_type) for arg_cls in args_cls
+                issubclass2(arg_cls, arg_generic_type) for arg_cls in args_cls
             )
 
         if len(args_cls) != 1:
@@ -197,7 +197,7 @@ def issubclass(cls: type | GenericAlias, generic_type: type | GenericAlias) -> b
         if not issubclass(origin_cls, origin_generic_type):
             return False
         if origin_cls in (list, Sequence, Iterable, Collection):
-            return issubclass(arg_cls, arg_generic_type)
+            return issubclass2(arg_cls, arg_generic_type)
         else:
             raise NotImplementedError(f"Got unknown origin {origin_cls} for {cls}")
     elif isinstance(cls, GenericAlias) and isinstance(generic_type, type):
