@@ -108,11 +108,6 @@ def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
         if origin_cls is None:
             raise TypeError(f"Got no origin for {cls}")
 
-        # As long as origin_cls isn't one of the two special types, Literal and Union, we can use the built-in
-        # isinstance function.
-        if origin_cls not in (Literal, Union) and not isinstance(obj, origin_cls):
-            return False
-
         args = get_args(cls)
 
         if len(args) > 0:
