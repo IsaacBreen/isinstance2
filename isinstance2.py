@@ -45,6 +45,8 @@ def _is_instance_of_literal(obj: Any, *args: type | GenericAlias) -> bool:
     return False
 
 
+# Tuple instance checks must be treated separately from other iterables because
+# they have variadic arguments.
 @register(instance_checker_registry, tuple)
 @register(instance_checker_registry, Tuple)
 def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
@@ -58,38 +60,18 @@ def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
         return len(obj) == len(args) and all(isinstance2(item, arg) for item, arg in zip(obj, args))
 
 
-@register(instance_checker_registry, list)
-@register(instance_checker_registry, List)
-def _is_instance_of_list(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
-    if not isinstance(obj, list):
-        return False
-    return arg is None or all(isinstance2(item, arg) for item in obj)
-
-
-@register(instance_checker_registry, Sequence)
-def _is_instance_of_sequence(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
-    if not isinstance(obj, Sequence):
-        return False
-    return arg is None or all(isinstance2(item, arg) for item in obj)
-
-
-@register(instance_checker_registry, Iterable)
-def _is_instance_of_iterable(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
-    if not isinstance(obj, Iterable):
-        return False
-    return arg is None or all(isinstance2(item, arg) for item in obj)
-
-
-@register(instance_checker_registry, Collection)
-def _is_instance_of_collection(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
-    if not isinstance(obj, Collection):
-        return False
-    return arg is None or all(isinstance2(item, arg) for item in obj)
-
+for IterableSubtype in (Iterable, Collection, Sequence, List, list, Set, set, frozenset):
+    @register(instance_checker_registry, IterableSubtype)
+    def _is_instance_of_iterable(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
+        if not isinstance(obj, IterableSubtype):
+            return False
+        return arg is None or all(isinstance2(item, arg) for item in obj)
 
 for MappingType in (Mapping, MutableMapping, Dict, dict):
     @register(instance_checker_registry, MappingType)
-    def _is_instance_of_mapping(obj: Any, key_type: Optional[type | GenericAlias], value_type: Optional[type | GenericAlias]) -> bool:
+    def _is_instance_of_mapping(
+        obj: Any, key_type: Optional[type | GenericAlias], value_type: Optional[type | GenericAlias]
+    ) -> bool:
         if not isinstance(obj, MappingType):
             return False
         if key_type is None and value_type is None:
@@ -124,6 +106,9 @@ def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
             else:
                 raise TypeError(f"Did not find a checker for {origin_cls}")
 
+    elif cls is Any:
+        return True
+
     elif isinstance(cls, type):
         return isinstance(obj, cls)
 
@@ -142,7 +127,9 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
     Returns:
         True if the class is a subclass of the superclass, False otherwise.
     """
-    if isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
+    if superclass is Any:
+        return True
+    elif isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
         # Each argument of the union must be a subclass of the superclass
         return all(issubclass2(arg, superclass) for arg in get_args(cls))
     elif isinstance(cls, GenericAlias) and get_origin(cls) == Literal:
