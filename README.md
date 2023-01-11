@@ -31,7 +31,7 @@ assert isinstance2([1, 2, 3], list[int])
 assert isinstance2((1, 2.0, 'three'), tuple[int, float, str])
 assert isinstance2({1, 2, 3}, set[int])
 assert isinstance2({"foo": 1, "bar": 2}, dict[str, int])
-assert isinstance2(frozenset([1, 2, 'Hi! 😊']), frozenset[int | Literal['Hi! 😊']])
+assert isinstance2(frozenset([1, 2, 'Hi! 😊', 'literally amazing']), frozenset[int | Literal['Hi! 😊', 'literally amazing']])
 
 # Ellipses in tuples work
 assert isinstance2((1, 'two', 3.0, 'four'), tuple[int | float | str, ...])
