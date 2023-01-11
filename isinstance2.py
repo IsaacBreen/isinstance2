@@ -60,25 +60,35 @@ def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
         return len(obj) == len(args) and all(isinstance2(item, arg) for item, arg in zip(obj, args))
 
 
-for IterableSubtype in (Iterable, Collection, Sequence, List, list, Set, set, frozenset):
-    @register(instance_checker_registry, IterableSubtype)
-    def _is_instance_of_iterable(obj: Any, arg: Optional[type | GenericAlias]) -> bool:
-        if not isinstance(obj, IterableSubtype):
-            return False
-        return arg is None or all(isinstance2(item, arg) for item in obj)
+def _is_instance_of_iterable(obj: Any, arg: Optional[type | GenericAlias], *, IterableSubtype: type) -> bool:
+    if not isinstance(obj, IterableSubtype):
+        return False
+    return arg is None or all(isinstance2(item, arg) for item in obj)
 
-for MappingType in (Mapping, MutableMapping, Dict, dict):
-    @register(instance_checker_registry, MappingType)
-    def _is_instance_of_mapping(
-        obj: Any, key_type: Optional[type | GenericAlias], value_type: Optional[type | GenericAlias]
-    ) -> bool:
-        if not isinstance(obj, MappingType):
-            return False
-        if key_type is None and value_type is None:
-            return True
-        if key_type is None or value_type is None:
-            raise TypeError(f"Got only one of key_type and value_type, expected both or neither")
-        return all(isinstance2(key, key_type) and isinstance2(value, value_type) for key, value in obj.items())
+
+for IterableSubtype in (Iterable, Collection, Sequence, List, list, Set, set, frozenset):
+    register(instance_checker_registry, IterableSubtype)(
+        partial(_is_instance_of_iterable, IterableSubtype=IterableSubtype)
+    )
+
+
+def _is_instance_of_mapping(
+    obj: Any, key_type: Optional[type | GenericAlias], value_type: Optional[type | GenericAlias], *,
+    MappingSubtype: type
+) -> bool:
+    if not isinstance(obj, MappingSubtype):
+        return False
+    if key_type is None and value_type is None:
+        return True
+    if key_type is None or value_type is None:
+        raise TypeError(f"Got only one of key_type and value_type, expected both or neither")
+    return all(isinstance2(key, key_type) and isinstance2(value, value_type) for key, value in obj.items())
+
+
+for MappingSubtype in (Mapping, MutableMapping, Dict, dict):
+    register(instance_checker_registry, MappingSubtype)(
+        partial(_is_instance_of_mapping, MappingSubtype=MappingSubtype)
+    )
 
 
 def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
@@ -98,6 +108,11 @@ def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
         if origin_cls is None:
             raise TypeError(f"Got no origin for {cls}")
 
+        # As long as origin_cls isn't one of the two special types, Literal and Union, we can use the built-in
+        # isinstance function.
+        if origin_cls not in (Literal, Union) and not isinstance(obj, origin_cls):
+            return False
+
         args = get_args(cls)
 
         if len(args) > 0:
@@ -105,6 +120,8 @@ def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
                 return instance_checker_registry[origin_cls](obj, *args)
             else:
                 raise TypeError(f"Did not find a checker for {origin_cls}")
+        else:
+            return True
 
     elif cls is Any:
         return True
@@ -235,8 +252,8 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
         # Neither cls nor superclass are a tuple or union
         if not issubclass(origin_cls, origin_superclass):
             return False
-        # Special cases for list, Sequence, Iterable, and Collection
-        if origin_cls in (list, Sequence, Iterable, Collection):
+        # Other builtin collections
+        if origin_cls in (Iterable, Collection, Sequence, List, list, Set, set, frozenset):
             return issubclass2(arg_cls, arg_superclass)
         else:
             raise NotImplementedError(f"Got unknown origin {origin_cls} for {cls}")
