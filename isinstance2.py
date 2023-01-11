@@ -141,6 +141,14 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
     Returns:
         True if the class is a subclass of the superclass, False otherwise.
     """
+    # NOTE: This function needs a lot of work. It's way too long.
+    # TODO: Separate out the logic into smaller functions.
+    supported_classes = (GenericAlias,)
+    strictly_supported_types = (tuple, Tuple, list, List, Iterable, Collection, Sequence, Set, set, frozenset, dict, Dict, str)
+    if not any(isinstance(cls, supported_classe) for supported_classe in supported_classes) and not cls in strictly_supported_types:
+        raise TypeError(f"Expected an instance of {supported_classes} or one of {strictly_supported_types}; got {superclass}")
+    if not any(isinstance(superclass, supported_classe) for supported_classe in supported_classes) and not superclass in strictly_supported_types:
+        raise TypeError(f"Expected an instance of {supported_classes} or one of {strictly_supported_types}; got {superclass}")
     if superclass is Any:
         return True
     elif isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
@@ -272,6 +280,15 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
             return issubclass2(arg_cls, arg_superclass)
         else:
             raise NotImplementedError(f"Got unknown origin {origin_cls} for {cls}")
+    if cls == str:
+        if isinstance(superclass, type):
+            return issubclass(str, superclass)
+        elif isinstance(superclass, GenericAlias):
+            if get_origin(superclass) == Iterable and not issubclass(str, get_args(superclass)[0]):
+                return False
+            return issubclass(str, get_origin(superclass))
+        else:
+            raise NotImplementedError(f"Got unknown superclass {superclass} for {cls}")
     elif isinstance(cls, GenericAlias) and isinstance(superclass, type):
         # The origin of cls must be a subclass of superclass
         return issubclass(get_origin(cls), superclass)
