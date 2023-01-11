@@ -4,6 +4,17 @@
 generic type hints. It allows you to perform runtime instance type checks on objects that are instances of a generic
 class, as well as subclass checks on generic classes, even if you don't know the exact type of the generic parameters.
 
+### tl;dr
+
+```python
+from isinstance2 import isinstance2, issubclass2
+from typing import Iterable
+
+assert isinstance2((1, 2.0, 'three'), tuple[int, float, str])
+assert issubclass2(dict[str, int], dict[str, int | float])
+assert issubclass2(list[int] | set[int] | tuple[int, ...], Iterable[int])
+```
+
 ## Features
 
 - Perform runtime instance and subclass checks on generic classes
