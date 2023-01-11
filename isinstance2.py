@@ -211,6 +211,24 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
         if origin_superclass == tuple and not issubclass(origin_cls, tuple):
             return False
 
+        # TODO: can this be combined with the above? Or otherwise simplified?
+        if origin_superclass != tuple and origin_cls == tuple and issubclass(origin_superclass, Iterable):
+            if Ellipsis in args_cls:
+                if len(args_cls) != 2:
+                    raise TypeError(f"Tuple with Ellipsis must have exactly two arguments; got {len(args_cls)}")
+                if args_cls[0] is Ellipsis:
+                    raise TypeError("Tuple with Ellipsis must have exactly two arguments and the first argument must not be Ellipsis")
+                if args_cls[1] is Ellipsis:
+                    return issubclass(origin_cls, origin_superclass) and issubclass2(args_cls[0], args_cls[0])
+            else:
+                return issubclass(origin_cls, origin_superclass) and all(issubclass2(arg_cls, args_superclass[0]) for arg_cls in args_cls)
+
+        # If, by this point, either class is a subclass of tuple, we cannot handle it
+        if issubclass(origin_cls, tuple):
+            raise NotImplementedError(f"Got subclass of tuple for {cls}")
+        if issubclass(origin_superclass, tuple):
+            raise NotImplementedError(f"Got subclass of tuple for {superclass}")
+
         # Check for the mapping cases
         if issubclass(origin_superclass, Mapping):
             # The origin of cls must be a subclass of the origin of superclass
