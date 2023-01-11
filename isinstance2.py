@@ -9,45 +9,49 @@ from collections.abc import Sequence
 from types import UnionType
 from typing import Any
 from typing import Literal
-from typing import Optional
+from typing import TypeVar
+from typing import TypeVarTuple
 from typing import Union
 from typing import get_args
 from typing import get_origin
 
 GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | types.UnionType  # type: ignore
 
-instance_checkers: dict[tuple[type], callable[[Any, type, Optional[Sequence[type | GenericAlias]]], bool]] = {}
-subclass_checkers: dict[
-    tuple[type, type],
-    callable[[
-        type, type,
-        Optional[Sequence[type | GenericAlias]],
-        Optional[Sequence[type | GenericAlias]]
-    ], bool]
-] = {}
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+instance_checker_registry: dict[type, callable] = {}
 
 
-def register(checkers: 
+def register(registry, key):
+    def decorator(func):
+        registry[key] = func
+        return func
+
+    return decorator
 
 
-def _is_instance_of_union(obj: Any, union_type: GenericAlias) -> bool:
-    for arg in get_args(union_type):
+@register(instance_checker_registry, Union)
+@register(instance_checker_registry, UnionType)
+def _is_instance_of_union(obj: Any, *args: type | GenericAlias) -> bool:
+    for arg in args:
         if isinstance_generic(obj, arg):
             return True
     return False
 
 
-def _is_instance_of_literal(obj: Any, literal_type: GenericAlias) -> bool:
-    for arg in get_args(literal_type):
+@register(instance_checker_registry, Literal)
+def _is_instance_of_literal(obj: Any, *args: type | GenericAlias) -> bool:
+    for arg in args:
         if obj == arg:
             return True
     return False
 
 
-def _is_instance_of_tuple(obj: Any, tuple_type: GenericAlias) -> bool:
+@register(instance_checker_registry, tuple)
+def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
     if not isinstance(obj, tuple):
         return False
-    args = get_args(tuple_type)
     if Ellipsis in args:
         if len(args) != 2:
             raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args)}")
@@ -56,47 +60,35 @@ def _is_instance_of_tuple(obj: Any, tuple_type: GenericAlias) -> bool:
         return len(obj) == len(args) and all(isinstance_generic(item, arg) for item, arg in zip(obj, args))
 
 
-def _is_instance_of_list(obj: Any, list_type: list) -> bool:
+@register(instance_checker_registry, list)
+def _is_instance_of_list(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, list):
         return False
-    args = get_args(list_type)
-    if len(args) != 1:
-        raise TypeError(f"Got {len(args)} arguments for list, expected 1")
-    arg = args[0]
     return all(isinstance_generic(item, arg) for item in obj)
 
 
-def _is_instance_of_sequence(obj: Any, sequence_type: Sequence) -> bool:
+@register(instance_checker_registry, Sequence)
+def _is_instance_of_sequence(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Sequence):
         return False
-    args = get_args(sequence_type)
-    if len(args) != 1:
-        raise TypeError(f"Got {len(args)} arguments for Sequence, expected 1")
-    arg = args[0]
     return all(isinstance_generic(item, arg) for item in obj)
 
 
-def _is_instance_of_iterable(obj: Any, iterable_type: Iterable) -> bool:
+@register(instance_checker_registry, Iterable)
+def _is_instance_of_iterable(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Iterable):
         return False
-    args = get_args(iterable_type)
-    if len(args) != 1:
-        raise TypeError(f"Got {len(args)} arguments for Iterable, expected 1")
-    arg = args[0]
     return all(isinstance_generic(item, arg) for item in obj)
 
 
-def _is_instance_of_collection(obj: Any, collection_type: Collection) -> bool:
+@register(instance_checker_registry, Collection)
+def _is_instance_of_collection(obj: Any, arg: type | GenericAlias) -> bool:
     if not isinstance(obj, Collection):
         return False
-    args = get_args(collection_type)
-    if len(args) != 1:
-        raise TypeError(f"Got {len(args)} arguments for Collection, expected 1")
-    arg = args[0]
     return all(isinstance_generic(item, arg) for item in obj)
 
 
-def isinstance_generic(obj: Any, generic_type: type | GenericAlias) -> bool:  # type: ignore
+def isinstance_generic(obj: Any, generic_type: type | GenericAlias) -> bool:
     """
     Check if an object is an instance of a subscripted generic type.
 
@@ -113,22 +105,15 @@ def isinstance_generic(obj: Any, generic_type: type | GenericAlias) -> bool:  # 
         if origin_generic_type is None:
             raise TypeError(f"Got no origin for {generic_type}")
 
-        if origin_generic_type in (Union, UnionType):
-            return _is_instance_of_union(obj, generic_type)
-        elif origin_generic_type == Literal:
-            return _is_instance_of_literal(obj, generic_type)
-        elif origin_generic_type == tuple:
-            return _is_instance_of_tuple(obj, generic_type)
-        elif origin_generic_type == list:
-            return _is_instance_of_list(obj, generic_type)
-        elif origin_generic_type == Sequence:
-            return _is_instance_of_sequence(obj, generic_type)
-        elif origin_generic_type == Iterable:
-            return _is_instance_of_iterable(obj, generic_type)
-        elif origin_generic_type == Collection:
-            return _is_instance_of_collection(obj, generic_type)
+        args = get_args(generic_type)
+
+        if len(args) == 0:
+            return isinstance(obj, origin_generic_type)
         else:
-            raise TypeError(f"Got unknown origin {origin_generic_type} for {generic_type}")
+            if origin_generic_type in instance_checker_registry:
+                return instance_checker_registry[origin_generic_type](obj, *args)
+            else:
+                raise TypeError(f"Did not find a checker for {origin_generic_type}")
 
     elif isinstance(generic_type, type):
         return isinstance(obj, generic_type)
