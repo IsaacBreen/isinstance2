@@ -1,12 +1,5 @@
 """
-Extensions of `isinstance` and `issubclass` that work with subscripted generics.
-
-Example:
-
-```python
-assert isinstance_generic((1, 2.0, "three", "four"), tuple[int, float, str, Literal["four"]])
-assert issubclass_generic([1, 2.0 "three", "four"], Sequence[int | float | str])
-```
+This module provides implementations of isinstance_generic and issubclass_generic functions which extends the built-in isinstance and issubclass functions in Python to work with subscripted generics, which are a feature of the typing module in Python.
 """
 import types
 import typing
@@ -16,11 +9,91 @@ from collections.abc import Sequence
 from types import UnionType
 from typing import Any
 from typing import Literal
+from typing import Optional
 from typing import Union
 from typing import get_args
 from typing import get_origin
 
 GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | types.UnionType  # type: ignore
+
+instance_checkers: dict[tuple[type], callable[[Any, type, Optional[Sequence[type | GenericAlias]]], bool]] = {}
+subclass_checkers: dict[
+    tuple[type, type],
+    callable[[
+        type, type,
+        Optional[Sequence[type | GenericAlias]],
+        Optional[Sequence[type | GenericAlias]]
+    ], bool]
+] = {}
+
+
+def register(checkers: 
+
+
+def _is_instance_of_union(obj: Any, union_type: GenericAlias) -> bool:
+    for arg in get_args(union_type):
+        if isinstance_generic(obj, arg):
+            return True
+    return False
+
+
+def _is_instance_of_literal(obj: Any, literal_type: GenericAlias) -> bool:
+    for arg in get_args(literal_type):
+        if obj == arg:
+            return True
+    return False
+
+
+def _is_instance_of_tuple(obj: Any, tuple_type: GenericAlias) -> bool:
+    if not isinstance(obj, tuple):
+        return False
+    args = get_args(tuple_type)
+    if Ellipsis in args:
+        if len(args) != 2:
+            raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args)}")
+        return all(isinstance_generic(item, args[0]) for item in obj)
+    else:
+        return len(obj) == len(args) and all(isinstance_generic(item, arg) for item, arg in zip(obj, args))
+
+
+def _is_instance_of_list(obj: Any, list_type: list) -> bool:
+    if not isinstance(obj, list):
+        return False
+    args = get_args(list_type)
+    if len(args) != 1:
+        raise TypeError(f"Got {len(args)} arguments for list, expected 1")
+    arg = args[0]
+    return all(isinstance_generic(item, arg) for item in obj)
+
+
+def _is_instance_of_sequence(obj: Any, sequence_type: Sequence) -> bool:
+    if not isinstance(obj, Sequence):
+        return False
+    args = get_args(sequence_type)
+    if len(args) != 1:
+        raise TypeError(f"Got {len(args)} arguments for Sequence, expected 1")
+    arg = args[0]
+    return all(isinstance_generic(item, arg) for item in obj)
+
+
+def _is_instance_of_iterable(obj: Any, iterable_type: Iterable) -> bool:
+    if not isinstance(obj, Iterable):
+        return False
+    args = get_args(iterable_type)
+    if len(args) != 1:
+        raise TypeError(f"Got {len(args)} arguments for Iterable, expected 1")
+    arg = args[0]
+    return all(isinstance_generic(item, arg) for item in obj)
+
+
+def _is_instance_of_collection(obj: Any, collection_type: Collection) -> bool:
+    if not isinstance(obj, Collection):
+        return False
+    args = get_args(collection_type)
+    if len(args) != 1:
+        raise TypeError(f"Got {len(args)} arguments for Collection, expected 1")
+    arg = args[0]
+    return all(isinstance_generic(item, arg) for item in obj)
 
 
 def isinstance_generic(obj: Any, generic_type: type | GenericAlias) -> bool:  # type: ignore
@@ -40,32 +113,22 @@ def isinstance_generic(obj: Any, generic_type: type | GenericAlias) -> bool:  # 
         if origin_generic_type is None:
             raise TypeError(f"Got no origin for {generic_type}")
 
-        args = get_args(generic_type)
-
         if origin_generic_type in (Union, UnionType):
-            return any(isinstance_generic(obj, arg) for arg in args)
+            return _is_instance_of_union(obj, generic_type)
         elif origin_generic_type == Literal:
-            return any(obj == arg for arg in args)
+            return _is_instance_of_literal(obj, generic_type)
         elif origin_generic_type == tuple:
-            if not isinstance(obj, origin_generic_type):
-                return False
-            if Ellipsis in args:
-                if len(args) != 2:
-                    raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args)}")
-                return all(isinstance_generic(item, args[0]) for item in obj)
-            else:
-                return len(obj) == len(args) and all(isinstance_generic(item, arg) for item, arg in zip(obj, args))
-
-        if len(args) != 1:
-            raise TypeError(f"Got {len(args)} arguments for {origin_generic_type}, expected 1")
-        arg = args[0]
-
-        if not isinstance(obj, origin_generic_type):
-            return False
-        elif origin_generic_type in (list, Sequence, Iterable, Collection):
-            return all(isinstance_generic(item, arg) for item in obj)
+            return _is_instance_of_tuple(obj, generic_type)
+        elif origin_generic_type == list:
+            return _is_instance_of_list(obj, generic_type)
+        elif origin_generic_type == Sequence:
+            return _is_instance_of_sequence(obj, generic_type)
+        elif origin_generic_type == Iterable:
+            return _is_instance_of_iterable(obj, generic_type)
+        elif origin_generic_type == Collection:
+            return _is_instance_of_collection(obj, generic_type)
         else:
-            raise NotImplementedError(f"Got unknown origin {origin_generic_type} for {generic_type}")
+            raise TypeError(f"Got unknown origin {origin_generic_type} for {generic_type}")
 
     elif isinstance(generic_type, type):
         return isinstance(obj, generic_type)
@@ -125,7 +188,7 @@ def issubclass_generic(cls: type | GenericAlias, generic_type: type | GenericAli
             elif Ellipsis not in args_cls and Ellipsis not in args_generic_type:
                 return len(args_cls) == len(args_generic_type) and all(
                     issubclass_generic(arg_cls, arg_generic_type) for arg_cls, arg_generic_type in
-                    zip(args_cls, args_generic_type)
+                        zip(args_cls, args_generic_type)
                 )
 
         if origin_generic_type == tuple and not issubclass(origin_cls, tuple):
