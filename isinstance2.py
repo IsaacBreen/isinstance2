@@ -127,10 +127,8 @@ def issubclass_generic(cls: type | GenericAlias, generic_type: type | GenericAli
                     issubclass_generic(arg_cls, arg_generic_type) for arg_cls, arg_generic_type in
                     zip(args_cls, args_generic_type)
                 )
-            elif origin_cls != tuple and origin_generic_type == tuple:
-                return False
 
-        if origin_cls != tuple and origin_generic_type == tuple:
+        if origin_generic_type == tuple and not issubclass(origin_cls, tuple):
             return False
 
         if len(args_generic_type) != 1:
