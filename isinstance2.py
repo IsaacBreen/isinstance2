@@ -54,7 +54,7 @@ def _is_instance_of_tuple(obj: Any, *args: type | GenericAlias) -> bool:
         return False
     if Ellipsis in args:
         if len(args) != 2:
-            raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args)}")
+            raise TypeError(f"Tuple with Ellipsis must have exactly two arguments; got {len(args)}")
         return all(isinstance2(item, args[0]) for item in obj)
     else:
         return len(obj) == len(args) and all(isinstance2(item, arg) for item, arg in zip(obj, args))
@@ -127,7 +127,7 @@ def isinstance2(
         return isinstance(obj, cls)
 
     else:
-        raise TypeError(f"Expected a type or a GenericAlias, got {cls} of type {type(cls)}")
+        raise TypeError(f"Expected a type or a GenericAlias; got {cls} of type {type(cls)}")
 
 
 def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bool:  # type: ignore
@@ -190,11 +190,11 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
             #
             if Ellipsis in args_cls:
                 if len(args_cls) != 2:
-                    raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args_cls)}")
+                    raise TypeError(f"Tuple with Ellipsis must have exactly two arguments; got {len(args_cls)}")
             if Ellipsis in args_superclass:
                 if len(args_superclass) != 2:
                     raise TypeError(
-                        f"Tuple with Ellipsis must have exactly two arguments, got {len(args_superclass)}"
+                        f"Tuple with Ellipsis must have exactly two arguments; got {len(args_superclass)}"
                     )
             if Ellipsis in args_cls and Ellipsis not in args_superclass:
                 return False
@@ -223,7 +223,7 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
 
             # Otherwise, both classes must have exactly two arguments
             if len(args_cls) != 2 or len(args_superclass) != 2:
-                raise TypeError(f"Expected two arguments, got {len(args_cls)} and {len(args_superclass)}")
+                raise TypeError(f"Expected two arguments; got {len(args_cls)} and {len(args_superclass)}")
 
             # The first argument of cls (the key) must be a subclass of the first argument of superclass,
             # and likewise for the second argument (the value)
@@ -231,7 +231,7 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
 
         # Get the single argument of superclass
         if len(args_superclass) != 1:
-            raise TypeError(f"Got {len(args_superclass)} arguments for {origin_superclass}, expected 1")
+            raise TypeError(f"Got {len(args_superclass)} arguments for {origin_superclass}; expected 1")
         arg_superclass = args_superclass[0]
 
         # If the origin of cls is a tuple and the origin of superclass is not a tuple, the origin of cls must be a
@@ -267,6 +267,6 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
     else:
         # cls and superclass must be either a type or a GenericAlias
         raise TypeError(
-            f"Expected both arguments to be either a type or a GenericAlias, got {cls} of type {type(cls)} and "
+            f"Expected both arguments to be either a type or a GenericAlias; got {cls} of type {type(cls)} and "
             f"{superclass} of type {type(superclass)}"
         )
