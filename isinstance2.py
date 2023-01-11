@@ -1,5 +1,6 @@
 """
-This module provides two functions - `isinstance2` and `issubclass2` - which extend the built-in `isinstance` and `issubclass` functions in Python to work with subscripted generics.
+This module provides two functions - `isinstance2` and `issubclass2` - which extend the built-in `isinstance` and
+`issubclass` functions in Python to work with subscripted generics.
 """
 import types
 import typing
@@ -88,126 +89,157 @@ def _is_instance_of_collection(obj: Any, arg: type | GenericAlias) -> bool:
     return all(isinstance2(item, arg) for item in obj)
 
 
-def isinstance2(obj: Any, generic_type: type | GenericAlias) -> bool:
+def isinstance2(obj: Any, cls: type | GenericAlias) -> bool:
     """
-    Check if an object is an instance of a subscripted generic type.
+    Check if an object is an instance of a subscripted superclass.
 
     Args:
         obj: The object to check.
-        generic_type: The subscripted generic type.
+        cls: The type to check against.
 
     Returns:
-        True if the object is an instance of the generic type, False otherwise.
+        True if the object is an instance of the superclass, False otherwise.
     """
-    if isinstance(generic_type, GenericAlias):
-        origin_generic_type = get_origin(generic_type)
-
-        if origin_generic_type is None:
-            raise TypeError(f"Got no origin for {generic_type}")
-
-        args = get_args(generic_type)
-
-        if len(args) == 0:
-            return isinstance(obj, origin_generic_type)
-        else:
-            if origin_generic_type in instance_checker_registry:
-                return instance_checker_registry[origin_generic_type](obj, *args)
-            else:
-                raise TypeError(f"Did not find a checker for {origin_generic_type}")
-
-    elif isinstance(generic_type, type):
-        return isinstance(obj, generic_type)
-
-    else:
-        raise TypeError(f"Expected a type or a GenericAlias, got {generic_type} of type {type(generic_type)}")
-
-
-def issubclass2(cls: type | GenericAlias, generic_type: type | GenericAlias) -> bool:  # type: ignore
-    """
-    Check if a class is a subclass of a subscripted generic type.
-
-    Args:
-        cls: The class to check.
-        generic_type: The subscripted generic type.
-
-    Returns:
-        True if the class is a subclass of the generic type, False otherwise.
-    """
-    # NOTE: I haven't figured out how to split this function up sensibly like above. But here it is.
-    if isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
-        return all(issubclass2(arg, generic_type) for arg in get_args(cls))
-    elif isinstance(cls, GenericAlias) and get_origin(cls) == Literal:
-        return all(isinstance2(obj, generic_type) for obj in get_args(cls))
-    elif isinstance(generic_type, GenericAlias) and get_origin(generic_type) in (Union, UnionType):
-        return any(issubclass2(cls, arg) for arg in get_args(generic_type))
-    elif isinstance(cls, GenericAlias) and isinstance(generic_type, GenericAlias):
-        origin_cls: type = get_origin(cls)
-        origin_generic_type: type = get_origin(generic_type)
+    if isinstance(cls, GenericAlias):
+        origin_cls = get_origin(cls)
 
         if origin_cls is None:
             raise TypeError(f"Got no origin for {cls}")
-        if origin_generic_type is None:
-            raise TypeError(f"Got no origin for {generic_type}")
 
+        args = get_args(cls)
+
+        if len(args) == 0:
+            return isinstance(obj, origin_cls)
+        else:
+            if origin_cls in instance_checker_registry:
+                return instance_checker_registry[origin_cls](obj, *args)
+            else:
+                raise TypeError(f"Did not find a checker for {origin_cls}")
+
+    elif isinstance(cls, type):
+        return isinstance(obj, cls)
+
+    else:
+        raise TypeError(f"Expected a type or a GenericAlias, got {cls} of type {type(cls)}")
+
+
+def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bool:  # type: ignore
+    """
+    Check if a class is a subclass of a subscripted superclass.
+
+    Args:
+        cls: The class to check.
+        superclass: The type to check against.
+
+    Returns:
+        True if the class is a subclass of the superclass, False otherwise.
+    """
+    if isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
+        # Each argument of the union must be a subclass of the superclass
+        return all(issubclass2(arg, superclass) for arg in get_args(cls))
+    elif isinstance(cls, GenericAlias) and get_origin(cls) == Literal:
+        # Each argument of the literal must be an instance of the superclass
+        return all(isinstance2(obj, superclass) for obj in get_args(cls))
+    elif isinstance(superclass, GenericAlias) and get_origin(superclass) in (Union, UnionType):
+        # The class must be a subclass of at least one argument of the union
+        return any(issubclass2(cls, arg) for arg in get_args(superclass))
+    elif isinstance(cls, GenericAlias) and isinstance(superclass, GenericAlias):
+        # Get the origins of each superclass
+        origin_cls: type = get_origin(cls)
+        origin_superclass: type = get_origin(superclass)
+
+        # Get the arguments of each superclass
         args_cls = get_args(cls)
-        args_generic_type = get_args(generic_type)
+        args_superclass = get_args(superclass)
 
+        # Check for special cases
+        if origin_cls is None:
+            raise TypeError(f"Got no origin for {cls}")
+        if origin_superclass is None:
+            raise TypeError(f"Got no origin for {superclass}")
         if origin_cls != tuple and issubclass(origin_cls, tuple):
             raise NotImplementedError(f"Got subclass of tuple for {cls}")
-        if origin_generic_type != tuple and issubclass(origin_generic_type, tuple):
-            raise NotImplementedError(f"Got subclass of tuple for {generic_type}")
-        if origin_cls == tuple and origin_generic_type == tuple:
+        if origin_superclass != tuple and issubclass(origin_superclass, tuple):
+            raise NotImplementedError(f"Got subclass of tuple for {superclass}")
+
+        if origin_cls == tuple and origin_superclass == tuple:
+            # We must be careful to handle Ellipsis. There are four cases:
+            #
+            #   1. Ellipsis in cls and not in superclass
+            #     - The cls tuple can be arbitrarily long, but the superclass tuple must have exactly two arguments.
+            #       So, cls cannot be a subclass of superclass.
+            #
+            #   2. Ellipsis not in cls and in superclass
+            #     - Each argument of cls must be a subclass of the first argument of superclass.
+            #
+            #   3. Ellipsis in both cls and superclass
+            #     - The first argument of cls must be a subclass of the first argument of superclass.
+            #
+            #   4. Ellipsis not in either cls or superclass
+            #     - The two tuples must have the same length and each argument of cls must be a subclass of the
+            #       corresponding argument of superclass.
+            #
             if Ellipsis in args_cls:
                 if len(args_cls) != 2:
                     raise TypeError(f"Tuple with Ellipsis must have exactly two arguments, got {len(args_cls)}")
-            if Ellipsis in args_generic_type:
-                if len(args_generic_type) != 2:
+            if Ellipsis in args_superclass:
+                if len(args_superclass) != 2:
                     raise TypeError(
-                        f"Tuple with Ellipsis must have exactly two arguments, got {len(args_generic_type)}"
+                        f"Tuple with Ellipsis must have exactly two arguments, got {len(args_superclass)}"
                     )
-            if Ellipsis in args_cls and Ellipsis not in args_generic_type:
+            if Ellipsis in args_cls and Ellipsis not in args_superclass:
                 return False
-            elif Ellipsis not in args_cls and Ellipsis in args_generic_type:
-                return all(issubclass2(arg_cls, args_generic_type[0]) for arg_cls in args_cls)
-            elif Ellipsis in args_cls and Ellipsis in args_generic_type:
-                return issubclass2(args_cls[0], args_generic_type[0])
-            elif Ellipsis not in args_cls and Ellipsis not in args_generic_type:
-                return len(args_cls) == len(args_generic_type) and all(
-                    issubclass2(arg_cls, arg_generic_type) for arg_cls, arg_generic_type in
-                        zip(args_cls, args_generic_type)
+            elif Ellipsis not in args_cls and Ellipsis in args_superclass:
+                return all(issubclass2(arg_cls, args_superclass[0]) for arg_cls in args_cls)
+            elif Ellipsis in args_cls and Ellipsis in args_superclass:
+                return issubclass2(args_cls[0], args_superclass[0])
+            elif Ellipsis not in args_cls and Ellipsis not in args_superclass:
+                return len(args_cls) == len(args_superclass) and all(
+                    issubclass2(arg_cls, arg_superclass) for arg_cls, arg_superclass in zip(args_cls, args_superclass)
                 )
 
-        if origin_generic_type == tuple and not issubclass(origin_cls, tuple):
+        # If the superclass is a tuple, the origin of cls must be a subclass of the origin of superclass
+        if origin_superclass == tuple and not issubclass(origin_cls, tuple):
             return False
 
-        if len(args_generic_type) != 1:
-            raise TypeError(f"Got {len(args_generic_type)} arguments for {origin_generic_type}, expected 1")
-        arg_generic_type = args_generic_type[0]
+        # Get the single argument of superclass
+        if len(args_superclass) != 1:
+            raise TypeError(f"Got {len(args_superclass)} arguments for {origin_superclass}, expected 1")
+        arg_superclass = args_superclass[0]
 
-        if origin_cls == tuple and origin_generic_type != tuple:
-            return issubclass(origin_cls, origin_generic_type) and all(
-                issubclass2(arg_cls, arg_generic_type) for arg_cls in args_cls
+        # If the origin of cls is a tuple and the origin of superclass is not a tuple, the origin of cls must be a
+        # subclass of the origin of superclass
+        if origin_cls == tuple and origin_superclass != tuple:
+            return issubclass(origin_cls, origin_superclass) and all(
+                issubclass2(arg_cls, arg_superclass) for arg_cls in args_cls
             )
 
+        # Get the single argument of cls
         if len(args_cls) != 1:
             raise TypeError(f"Got {len(args_cls)} arguments for {origin_cls}, expected 1")
         arg_cls = args_cls[0]
 
-        # Neither cls nor generic_type are a tuple or union
-        if not issubclass(origin_cls, origin_generic_type):
+        # Neither cls nor superclass are a tuple or union
+        if not issubclass(origin_cls, origin_superclass):
             return False
+        # Special cases for list, Sequence, Iterable, and Collection
         if origin_cls in (list, Sequence, Iterable, Collection):
-            return issubclass2(arg_cls, arg_generic_type)
+            return issubclass2(arg_cls, arg_superclass)
         else:
             raise NotImplementedError(f"Got unknown origin {origin_cls} for {cls}")
-    elif isinstance(cls, GenericAlias) and isinstance(generic_type, type):
-        return issubclass(get_origin(cls), generic_type)
-    elif isinstance(cls, type) and isinstance(generic_type, GenericAlias):
-        return issubclass(cls, get_origin(generic_type))
-    elif isinstance(cls, type) and isinstance(generic_type, type):
-        return issubclass(cls, generic_type)
+    elif isinstance(cls, GenericAlias) and isinstance(superclass, type):
+        # The origin of cls must be a subclass of superclass
+        return issubclass(get_origin(cls), superclass)
+    elif isinstance(cls, type) and isinstance(superclass, GenericAlias):
+        # cls must be a subclass of the origin of superclass
+        return issubclass(cls, get_origin(superclass))
+    elif isinstance(cls, type) and isinstance(superclass, type):
+        # cls must be a subclass of superclass
+        return issubclass(cls, superclass)
 
     else:
+        # cls and superclass must be either a type or a GenericAlias
         raise TypeError(
-            f"Expected both arguments to be either a type or a GenericAlias, got {cls} of type {type(cls)} and {generic_type} of type {type(generic_type)}"
+            f"Expected both arguments to be either a type or a GenericAlias, got {cls} of type {type(cls)} and "
+            f"{superclass} of type {type(superclass)}"
         )
