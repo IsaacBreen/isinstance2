@@ -1,9 +1,9 @@
-import typing
+from typing import *
 
 import pytest
 
 from isinstance2 import GenericAlias, isinstance2, issubclass2, register_instance_checker
-from typing import *
+
 
 def test_isinstance2_with_int():
     assert isinstance2(1, int)
@@ -37,7 +37,7 @@ def test_isinstance2_with_literal():
 def test_isinstance2_with_nested_subscripted_generics():
     assert isinstance2([[(1, 2), (3, 4)], [(5, 6), (7, 8)]], list[list[tuple[int, int]]])
     assert not isinstance2([[(1, "2"), (3, 4)], [(5, 6), (7, 8)]], list[list[tuple[int, int]]])
-    assert not isinstance2({1, (2, 3), frozenset(4,5,6)}, set[int, tuple[int, int], frozenset[int]])
+    assert isinstance2({1, (2, 3), frozenset((4, 5, 6))}, set[int | tuple[int, int] | frozenset[int]])
 
 
 def test_isinstance2_with_complex_unions():
