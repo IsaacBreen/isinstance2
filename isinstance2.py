@@ -133,6 +133,7 @@ def issubclass_generic(cls: type | GenericAlias, generic_type: type | GenericAli
     Returns:
         True if the class is a subclass of the generic type, False otherwise.
     """
+    # NOTE: I haven't figured out how to split this function up sensibly like above. But here it is.
     if isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
         return all(issubclass_generic(arg, generic_type) for arg in get_args(cls))
     elif isinstance(cls, GenericAlias) and get_origin(cls) == Literal:
