@@ -1,22 +1,29 @@
-# Subscripted Generics
 
-This is a library for handling subscripted generics in Python.
+# isinstance2
 
-## Overview
-
-Subscripted generics are a feature of the [typing module](https://docs.python.org/3/library/typing.html) in Python which allow for more expressive typing. They allow you to define generic types with type parameters, such as `List[int]` or `Dict[str, int]`.
-
-This library provides two functions, `isinstance2` and `issubclass2`, which extend the built-in `isinstance` and `issubclass` functions in Python to work with subscripted generics.
+`isinstance2` is a module that provides a runtime type checker that is more powerful than the built-in `isinstance` function. It allows you to perform runtime type checks on objects that are instances of a generic class, but you don't know the exact type of the generic parameters. This is particularly useful when working with Python's built-in generic classes and generic type hints.
 
 ## Installation
 
-To install this library, simply run `pip install subscripted-generics`.
+To install `isinstance2`, you can use pip:
+
+```
+pip install isinstance2
+```
 
 ## Usage
 
-The two functions provided by this library are `isinstance2` and `issubclass2`. They both work in the same way as the built-in `isinstance` and `issubclass` functions, with the added ability to handle subscripted generics.
-
-For example, the following code will work in Python 3.7 and above:
+Here is an example of how to use `isinstance2`:
 
 ```python
-from subscripted
+from typing import List, Union
+from isinstance2 import isinstance2
+
+def foo(x: List[Union[int, str]]):
+    if isinstance2(x, List[Union[int, str]]):
+        print("x is a list of integers or strings")
+    else:
+        print("x is not a list of integers or strings")
+
+foo([1, 2, 3])  # prints "x is a list of integers or strings"
+foo(["a", "b", "c"])  # prints "x is a list
