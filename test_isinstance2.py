@@ -1,8 +1,8 @@
-import pytest
 import typing
 
-from isinstance2 import GenericAlias
-from isinstance2 import isinstance2, issubclass2, register_instance_checker
+import pytest
+
+from isinstance2 import GenericAlias, isinstance2, issubclass2, register_instance_checker
 
 
 def test_isinstance2_with_int():

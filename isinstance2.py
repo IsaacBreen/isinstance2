@@ -4,25 +4,10 @@ This module provides two functions - `isinstance2` and `issubclass2` - which ext
 """
 import types
 import typing
-from collections.abc import Collection
-from collections.abc import Iterable
-from collections.abc import Mapping
-from collections.abc import MutableMapping
-from collections.abc import Sequence
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
 from functools import partial
 from types import UnionType
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Tuple
-from typing import TypeVar
-from typing import TypeVarTuple
-from typing import Union
-from typing import get_args
-from typing import get_origin
-from typing import Optional
-
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple, TypeVar, TypeVarTuple, Union, get_args, get_origin
 
 GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | types.UnionType  # type: ignore
 
