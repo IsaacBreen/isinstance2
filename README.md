@@ -116,8 +116,11 @@ Now you can use `my_register` in place of `register_instance_checker`.
     - `TypeVar`
     - `Container`
     - And likely quite a few other generic classes that I've missed. Please open an issue if you find one.
-- Subclass checks for custom classes (instance checks are supported)
-  - Requires Python 3.11 or later
+  - Subclass checks for custom classes (instance checks are supported)
+- Subclass checks are, in general, unreliable.
+  - I haven't yet figured out how to deal with things like structural subtyping. For instance, `issubclass2(str, Iterator[int])` currently returns `True` when it clearly shouldn't
+  - Instance checks are somewhat simpler and shouldn't suffer as much from this problem.
+- Requires Python 3.11 or later
 
 ## License
 
