@@ -143,12 +143,6 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
     """
     # NOTE: This function needs a lot of work. It's way too long.
     # TODO: Separate out the logic into smaller functions.
-    supported_classes = (GenericAlias,)
-    strictly_supported_types = (tuple, Tuple, list, List, Iterable, Collection, Sequence, Set, set, frozenset, dict, Dict, str)
-    if not any(isinstance(cls, supported_classe) for supported_classe in supported_classes) and not cls in strictly_supported_types:
-        raise TypeError(f"Expected an instance of {supported_classes} or one of {strictly_supported_types}; got {superclass}")
-    if not any(isinstance(superclass, supported_classe) for supported_classe in supported_classes) and not superclass in strictly_supported_types:
-        raise TypeError(f"Expected an instance of {supported_classes} or one of {strictly_supported_types}; got {superclass}")
     if superclass is Any:
         return True
     elif isinstance(cls, GenericAlias) and get_origin(cls) in (Union, UnionType):
