@@ -1,6 +1,6 @@
 # isinstance2
 
-`isinstance2` is a module that provides a powerful runtime type checker for Python's built-in generic classes and
+`isinstance2` is an experimental module that provides a powerful runtime type checker for Python's built-in generic classes and
 generic type hints. It allows you to perform runtime instance type checks on objects that are instances of a generic
 class, as well as subclass checks on generic classes, even if you don't know the exact type of the generic parameters.
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "isinstance2"
-version = "0.1.7"
+version = "0.1.8"
 description = ""
 authors = ["IsaacBreen <mail@isaacbreen.com>"]
 readme = "README.md"
