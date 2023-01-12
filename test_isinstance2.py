@@ -178,3 +178,15 @@ def test_issubclass2_with_dictionaries_with_subscripted_generics():
     assert not issubclass2(dict[str, int], dict[str, str])
     assert issubclass2(dict[str, int], dict[str, Union[int, str]])
     assert issubclass2(dict[str, int | str], dict[str, Union[int, str]])
+
+
+def test_issubclass2_with_str_and_nongeneric():
+    assert issubclass2(str, str)
+    assert not issubclass2(str, int)
+    assert issubclass2(str, Iterable)
+
+
+@pytest.mark.xfail
+def test_issubclass2_with_string_and_generic():
+    assert issubclass2(str, Iterable[str])
+    assert not issubclass2(str, Iterable[int])

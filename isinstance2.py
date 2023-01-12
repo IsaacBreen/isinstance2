@@ -9,7 +9,7 @@ from functools import partial
 from types import UnionType
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, TypeVar, TypeVarTuple, Union, get_args, get_origin
 
-GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | types.UnionType  # type: ignore
+GenericAlias = types.GenericAlias | typing.GenericAlias | typing._GenericAlias | typing._SpecialGenericAlias | types.UnionType  # type: ignore
 
 T = TypeVar("T")
 Ts = TypeVarTuple("Ts")
@@ -278,7 +278,8 @@ def issubclass2(cls: type | GenericAlias, superclass: type | GenericAlias) -> bo
         if isinstance(superclass, type):
             return issubclass(str, superclass)
         elif isinstance(superclass, GenericAlias):
-            if get_origin(superclass) == Iterable and not issubclass(str, get_args(superclass)[0]):
+            args_superclass = get_args(superclass)
+            if get_origin(superclass) == Iterable and args_superclass and not issubclass(str, args_superclass[0]):
                 return False
             return issubclass(str, get_origin(superclass))
         else:
